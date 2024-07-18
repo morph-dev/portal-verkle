@@ -1,9 +1,9 @@
 use std::collections::HashSet;
 
 use alloy_primitives::{address, keccak256, U8};
-use portal_verkle_trie::nodes::portal::ssz::TriePath;
-use verkle_core::{
+use portal_verkle_primitives::{
     constants::{BALANCE_LEAF_KEY, CODE_KECCAK_LEAF_KEY, NONCE_LEAF_KEY, VERSION_LEAF_KEY},
+    ssz::TriePath,
     storage::AccountStorageLayout,
     TrieValue,
 };

@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, HashMap};
 
 use alloy_primitives::{b256, keccak256, Address, Bytes, B256, U256, U8};
+use portal_verkle_primitives::{storage::AccountStorageLayout, Stem, TrieKey, TrieValue};
 use serde::{Deserialize, Serialize};
-use verkle_core::{storage::AccountStorageLayout, Stem, TrieKey, TrieValue};
 
 use super::witness::{StateDiff, StemStateDiff, SuffixStateDiff};
 

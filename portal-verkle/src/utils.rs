@@ -1,12 +1,12 @@
 use std::{fs::File, io::BufReader, path::Path};
 
-use portal_verkle_trie::nodes::portal::ssz::{sparse_vector::SparseVector, BundleProof};
-use ssz_types::FixedVector;
-use verkle_core::{
+use portal_verkle_primitives::{
     constants::PORTAL_NETWORK_NODE_WIDTH,
-    proof::{IpaProof, MultiPointProof},
+    proof::{BundleProof, IpaProof, MultiPointProof},
+    ssz::SparseVector,
     Point, ScalarField,
 };
+use ssz_types::FixedVector;
 
 use crate::{paths::genesis_path, types::genesis::GenesisConfig};
 
@@ -30,7 +30,7 @@ pub fn bundle_proof(
     _fragment_commitments: &SparseVector<Point, PORTAL_NETWORK_NODE_WIDTH>,
 ) -> BundleProof {
     // TODO: add implementation
-    dummy_multiproof()
+    BundleProof::new(dummy_multiproof())
 }
 
 pub fn dummy_multiproof() -> MultiPointProof {

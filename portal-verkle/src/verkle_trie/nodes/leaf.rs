@@ -1,15 +1,13 @@
 use std::array;
 
-use portal_verkle_trie::nodes::portal::ssz::{
-    nodes::{LeafBundleNode, LeafFragmentNode},
-    sparse_vector::SparseVector,
-};
-use verkle_core::{
+use portal_verkle_primitives::{
     constants::{
-        EXTENSION_C1_INDEX, EXTENSION_C2_INDEX, EXTENSION_MARKER_INDEX, EXTENSION_STEM_INDEX,
+        LEAF_C1_INDEX, LEAF_C2_INDEX, LEAF_MARKER_INDEX, LEAF_STEM_INDEX,
         PORTAL_NETWORK_NODE_WIDTH, VERKLE_NODE_WIDTH,
     },
     msm::{DefaultMsm, MultiScalarMultiplicator},
+    nodes::{LeafBundleNode, LeafFragmentNode},
+    ssz::SparseVector,
     Point, ScalarField, Stem, TrieValue, TrieValueSplit,
 };
 
@@ -33,8 +31,8 @@ impl LeafNode {
         let marker = 1;
 
         let commitment = DefaultMsm.commit_sparse(&[
-            (EXTENSION_MARKER_INDEX, ScalarField::from(marker)),
-            (EXTENSION_STEM_INDEX, ScalarField::from(&stem)),
+            (LEAF_MARKER_INDEX, ScalarField::from(marker)),
+            (LEAF_STEM_INDEX, ScalarField::from(&stem)),
         ]);
 
         Self {
@@ -81,14 +79,14 @@ impl LeafNode {
             let old_c1_commitment_hash = self.c1.commitment_hash();
             self.c1 += suffix_commitment_diff;
             self.commitment += DefaultMsm.scalar_mul(
-                EXTENSION_C1_INDEX,
+                LEAF_C1_INDEX,
                 self.c1.commitment_hash() - old_c1_commitment_hash,
             );
         } else {
             let old_c2_commitment_hash = self.c2.commitment_hash();
             self.c2 += suffix_commitment_diff;
             self.commitment += DefaultMsm.scalar_mul(
-                EXTENSION_C2_INDEX,
+                LEAF_C2_INDEX,
                 self.c2.commitment_hash() - old_c2_commitment_hash,
             );
         }
@@ -132,11 +130,11 @@ impl LeafNode {
             }
         }
         self.commitment += DefaultMsm.scalar_mul(
-            EXTENSION_C1_INDEX,
+            LEAF_C1_INDEX,
             self.c1.commitment_hash() - old_c1_commitment_hash,
         );
         self.commitment += DefaultMsm.scalar_mul(
-            EXTENSION_C2_INDEX,
+            LEAF_C2_INDEX,
             self.c2.commitment_hash() - old_c2_commitment_hash,
         );
         Ok(())
@@ -167,25 +165,23 @@ impl LeafNode {
             self.get_fragment_commitment(fragment_index)
         }));
         let bundle_proof = bundle_proof(&fragment_commitments);
-        LeafBundleNode {
-            marker: self.marker,
-            stem: *self.stem(),
-            fragments: fragment_commitments,
-            proof: bundle_proof,
-        }
+        LeafBundleNode::new(
+            self.marker,
+            *self.stem(),
+            fragment_commitments,
+            bundle_proof,
+        )
     }
 
     pub fn extract_fragment_node(&self, fragment_index: usize) -> (Point, LeafFragmentNode) {
         let fragment_commitment = self
             .get_fragment_commitment(fragment_index)
             .unwrap_or_else(Point::zero);
-        let fragment_node = LeafFragmentNode {
-            fragment_index: fragment_index as u8,
-            children: SparseVector::new(array::from_fn(|fragment_child_index| {
-                let child_index = fragment_index * PORTAL_NETWORK_NODE_WIDTH + fragment_child_index;
-                self.values[child_index]
-            })),
-        };
+        let children = SparseVector::new(array::from_fn(|fragment_child_index| {
+            let child_index = fragment_index * PORTAL_NETWORK_NODE_WIDTH + fragment_child_index;
+            self.values[child_index]
+        }));
+        let fragment_node = LeafFragmentNode::new(fragment_index as u8, children);
         (fragment_commitment, fragment_node)
     }
 }

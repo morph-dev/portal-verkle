@@ -7,7 +7,9 @@ use ethportal_api::{
     ContentValue, OverlayContentKey, VerkleContentKey, VerkleContentValue, VerkleNetworkApiClient,
 };
 use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
-use verkle_core::{constants::PORTAL_NETWORK_NODE_WIDTH, Point};
+use portal_verkle_primitives::{
+    constants::PORTAL_NETWORK_NODE_WIDTH, nodes::PortalVerkleNode, Point,
+};
 
 use crate::{
     types::state_write::{StateWrites, StemStateWrite, SuffixStateWrite},
@@ -33,7 +35,7 @@ impl StateTrieFetcher {
         while let Some(key) = stack.pop() {
             let value = self.fetch_content(&key).await?;
             match &value {
-                VerkleContentValue::BranchBundle(node) => {
+                VerkleContentValue::Node(PortalVerkleNode::BranchBundle(node)) => {
                     let VerkleContentKey::Bundle(_key_commitment) = &key else {
                         bail!(
                             "Invalid BranchBundle value received! key: {}, value: {}",
@@ -43,11 +45,11 @@ impl StateTrieFetcher {
                     };
                     // TODO check that commitment match
                     // TODO check that bundle proof is valid
-                    for commitment in node.fragments.iter_set_items() {
+                    for commitment in node.fragments().iter_set_items() {
                         stack.push(VerkleContentKey::BranchFragment(commitment.clone()));
                     }
                 }
-                VerkleContentValue::LeafBundle(node) => {
+                VerkleContentValue::Node(PortalVerkleNode::LeafBundle(node)) => {
                     let VerkleContentKey::Bundle(_key_commitment) = &key else {
                         bail!(
                             "Invalid LeafBundle value received! key: {}, value: {}",
@@ -57,14 +59,14 @@ impl StateTrieFetcher {
                     };
                     // TODO check that commitment match
                     // TODO check that bundle proof is valid
-                    for commitment in node.fragments.iter_set_items() {
+                    for commitment in node.fragments().iter_set_items() {
                         stack.push(VerkleContentKey::LeafFragment(LeafFragmentKey {
-                            stem: node.stem,
+                            stem: *node.stem(),
                             commitment: commitment.clone(),
                         }));
                     }
                 }
-                VerkleContentValue::BranchFragment(node) => {
+                VerkleContentValue::Node(PortalVerkleNode::BranchFragment(node)) => {
                     let VerkleContentKey::BranchFragment(_key_commitment) = &key else {
                         bail!(
                             "Invalid BranchFragment value received! key: {}, value: {}",
@@ -73,11 +75,11 @@ impl StateTrieFetcher {
                         )
                     };
                     // TODO check that commitment match
-                    for commitment in node.children.iter_set_items() {
+                    for commitment in node.children().iter_set_items() {
                         stack.push(VerkleContentKey::Bundle(commitment.clone()));
                     }
                 }
-                VerkleContentValue::LeafFragment(node) => {
+                VerkleContentValue::Node(PortalVerkleNode::LeafFragment(node)) => {
                     let VerkleContentKey::LeafFragment(leaf_fragment_key) = &key else {
                         bail!(
                             "Invalid LeafFragment value received! key: {}, value: {}",
@@ -86,16 +88,16 @@ impl StateTrieFetcher {
                         )
                     };
                     // TODO check that commitment match
-                    let start_index = node.fragment_index * PORTAL_NETWORK_NODE_WIDTH as u8;
+                    let start_index = node.fragment_index() * PORTAL_NETWORK_NODE_WIDTH;
                     let stem_state_write = StemStateWrite {
                         stem: leaf_fragment_key.stem,
                         suffix_writes: node
-                            .children
+                            .children()
                             .into_iter()
                             .enumerate()
                             .filter_map(|(index, opt_value)| {
                                 opt_value.map(|value| SuffixStateWrite {
-                                    suffix: start_index + index as u8,
+                                    suffix: (start_index + index) as u8,
                                     old_value: None,
                                     new_value: value,
                                 })

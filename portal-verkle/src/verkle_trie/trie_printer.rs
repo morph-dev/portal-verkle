@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use alloy_primitives::hex::{encode, encode_prefixed};
-use verkle_core::constants::VERKLE_NODE_WIDTH;
+use portal_verkle_primitives::constants::VERKLE_NODE_WIDTH;
 
 use super::{
     nodes::{branch::BranchNode, leaf::LeafNode, Node},

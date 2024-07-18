@@ -17,14 +17,16 @@ use portal_verkle::{
     utils::{dummy_multiproof, read_genesis},
     verkle_trie::PathToLeaf,
 };
-use portal_verkle_trie::nodes::portal::ssz::{
+use portal_verkle_primitives::{
+    constants::PORTAL_NETWORK_NODE_WIDTH,
     nodes::{
         BranchBundleNodeWithProof, BranchFragmentNode, BranchFragmentNodeWithProof,
         LeafBundleNodeWithProof, LeafFragmentNode, LeafFragmentNodeWithProof,
+        PortalVerkleNodeWithProof,
     },
-    TriePath, TrieProof,
+    ssz::{TriePath, TrieProof},
+    Point, Stem,
 };
-use verkle_core::{constants::PORTAL_NETWORK_NODE_WIDTH, Point, Stem};
 
 const LOCALHOST_BEACON_RPC_URL: &str = "http://localhost:9596/";
 const LOCALHOST_PORTAL_RPC_URL: &str = "http://localhost:8545/";
@@ -126,12 +128,14 @@ impl Gossiper {
                         &path_to_leaf,
                         branch.commitment(),
                     );
-                    VerkleContentValue::BranchBundleWithProof(BranchBundleNodeWithProof {
-                        node: branch.extract_bundle_node(),
-                        block_hash,
-                        path: trie_path.clone(),
-                        proof: trie_proof,
-                    })
+                    VerkleContentValue::NodeWithProof(PortalVerkleNodeWithProof::BranchBundle(
+                        BranchBundleNodeWithProof {
+                            node: branch.extract_bundle_node(),
+                            block_hash,
+                            path: trie_path.clone(),
+                            proof: trie_proof,
+                        },
+                    ))
                 });
 
                 let fragment_indices = if new_branch_nodes.contains(&trie_path) {
@@ -156,12 +160,16 @@ impl Gossiper {
                             branch.commitment(),
                             &fragment,
                         );
-                        VerkleContentValue::BranchFragmentWithProof(BranchFragmentNodeWithProof {
-                            node: fragment,
-                            block_hash,
-                            path: trie_path.clone(),
-                            proof: trie_proof,
-                        })
+                        VerkleContentValue::NodeWithProof(
+                            PortalVerkleNodeWithProof::BranchFragment(
+                                BranchFragmentNodeWithProof {
+                                    node: fragment,
+                                    block_hash,
+                                    path: trie_path.clone(),
+                                    proof: trie_proof,
+                                },
+                            ),
+                        )
                     });
                 }
             }
@@ -176,11 +184,13 @@ impl Gossiper {
                     &path_to_leaf,
                     bundle_commitment,
                 );
-                VerkleContentValue::LeafBundleWithProof(LeafBundleNodeWithProof {
-                    node: path_to_leaf.leaf.extract_bundle_node(),
-                    block_hash,
-                    proof: trie_proof,
-                })
+                VerkleContentValue::NodeWithProof(PortalVerkleNodeWithProof::LeafBundle(
+                    LeafBundleNodeWithProof {
+                        node: path_to_leaf.leaf.extract_bundle_node(),
+                        block_hash,
+                        proof: trie_proof,
+                    },
+                ))
             });
 
             // Leaf Fragments
@@ -207,11 +217,13 @@ impl Gossiper {
                         bundle_commitment,
                         &fragment_node,
                     );
-                    VerkleContentValue::LeafFragmentWithProof(LeafFragmentNodeWithProof {
-                        node: fragment_node,
-                        block_hash,
-                        proof: trie_proof,
-                    })
+                    VerkleContentValue::NodeWithProof(PortalVerkleNodeWithProof::LeafFragment(
+                        LeafFragmentNodeWithProof {
+                            node: fragment_node,
+                            block_hash,
+                            proof: trie_proof,
+                        },
+                    ))
                 });
             }
         }

@@ -1,6 +1,6 @@
 use std::ops::{Add, AddAssign};
 
-use verkle_core::{Point, ScalarField};
+use portal_verkle_primitives::{Point, ScalarField};
 
 pub struct Commitment {
     commitment: Point,

@@ -1,6 +1,6 @@
 use branch::BranchNode;
 use leaf::LeafNode;
-use verkle_core::{Point, ScalarField};
+use portal_verkle_primitives::{Point, ScalarField};
 
 pub mod branch;
 pub mod commitment;

@@ -1,5 +1,5 @@
+use portal_verkle_primitives::{Stem, TrieValue};
 use thiserror::Error;
-use verkle_core::{Stem, TrieValue};
 
 #[derive(Debug, Error)]
 pub enum VerkleTrieError {

@@ -1,13 +1,10 @@
 use std::{array, mem};
 
-use portal_verkle_trie::nodes::portal::ssz::{
-    nodes::{BranchBundleNode, BranchFragmentNode},
-    sparse_vector::SparseVector,
-    TriePath,
-};
-use verkle_core::{
+use portal_verkle_primitives::{
     constants::{PORTAL_NETWORK_NODE_WIDTH, VERKLE_NODE_WIDTH},
     msm::{DefaultMsm, MultiScalarMultiplicator},
+    nodes::{BranchBundleNode, BranchFragmentNode},
+    ssz::{SparseVector, TriePath},
     Point, ScalarField, Stem, TrieKey, TrieValue,
 };
 
@@ -163,28 +160,23 @@ impl BranchNode {
             self.get_fragment_commitment(fragment_index)
         }));
         let bundle_proof = bundle_proof(&fragment_commitments);
-        BranchBundleNode {
-            fragments: fragment_commitments,
-            proof: bundle_proof,
-        }
+        BranchBundleNode::new(fragment_commitments, bundle_proof)
     }
 
     pub fn extract_fragment_node(&self, fragment_index: usize) -> (Point, BranchFragmentNode) {
         let fragment_commitment = self
             .get_fragment_commitment(fragment_index)
             .unwrap_or_else(Point::zero);
-        let fragment_node = BranchFragmentNode {
-            fragment_index: fragment_index as u8,
-            children: SparseVector::new(array::from_fn(|fragment_child_index| {
-                let child_index = fragment_index * PORTAL_NETWORK_NODE_WIDTH + fragment_child_index;
-                let commitment = self.children[child_index].commitment();
-                if commitment.is_zero() {
-                    None
-                } else {
-                    Some(commitment)
-                }
-            })),
-        };
+        let children = SparseVector::new(array::from_fn(|fragment_child_index| {
+            let child_index = fragment_index * PORTAL_NETWORK_NODE_WIDTH + fragment_child_index;
+            let commitment = self.children[child_index].commitment();
+            if commitment.is_zero() {
+                None
+            } else {
+                Some(commitment)
+            }
+        }));
+        let fragment_node = BranchFragmentNode::new(fragment_index as u8, children);
         (fragment_commitment, fragment_node)
     }
 }

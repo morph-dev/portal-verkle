@@ -1,5 +1,5 @@
 use derive_more::{Constructor, Deref, Index, IndexMut};
-use verkle_core::{Stem, TrieValue};
+use portal_verkle_primitives::{Stem, TrieValue};
 
 use super::witness::{StateDiff, StemStateDiff, SuffixStateDiff};
 

@@ -1,8 +1,7 @@
 use std::collections::HashSet;
 
 use alloy_primitives::B256;
-use portal_verkle_trie::nodes::portal::ssz::TriePath;
-use verkle_core::{Stem, TrieKey, TrieValue};
+use portal_verkle_primitives::{ssz::TriePath, Stem, TrieKey, TrieValue};
 
 use super::{
     error::VerkleTrieError,

@@ -1,7 +1,7 @@
 use alloy_primitives::{Bytes, U8};
+use portal_verkle_primitives::{proof::IpaProof, Point, Stem, TrieValue};
 use serde::{Deserialize, Serialize};
 use serde_nested_with::serde_nested;
-use verkle_core::{proof::IpaProof, Point, Stem, TrieValue};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
