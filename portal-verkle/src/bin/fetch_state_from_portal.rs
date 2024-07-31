@@ -2,8 +2,8 @@ use anyhow::bail;
 use clap::Parser;
 use portal_verkle::{
     beacon_block_fetcher::BeaconBlockFetcher, state_trie_fetcher::StateTrieFetcher,
-    types::genesis::GenesisConfig,
 };
+use portal_verkle_primitives::verkle::genesis_config::GenesisConfig;
 
 const LOCALHOST_BEACON_RPC_URL: &str = "http://localhost:9596/";
 const LOCALHOST_PORTAL_RPC_URL: &str = "http://localhost:8545/";

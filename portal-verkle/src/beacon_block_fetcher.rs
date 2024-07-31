@@ -8,8 +8,8 @@ use reqwest::{Client, Url};
 use serde::Deserialize;
 
 use crate::{
-    paths::beacon_slot_path,
     types::{beacon::SignedBeaconBlock, JsonResponseMessage},
+    utils::beacon_slot_path,
 };
 
 const BEACON_BLOCK_URL_PATH: &str = "eth/v2/beacon/blocks/";

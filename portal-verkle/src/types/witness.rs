@@ -1,5 +1,7 @@
+use std::collections::HashMap;
+
 use alloy_primitives::{Bytes, U8};
-use portal_verkle_primitives::{proof::IpaProof, Point, Stem, TrieValue};
+use portal_verkle_primitives::{proof::IpaProof, verkle::StemStateWrite, Point, Stem, TrieValue};
 use serde::{Deserialize, Serialize};
 use serde_nested_with::serde_nested;
 
@@ -45,4 +47,26 @@ pub struct ExecutionWitness {
     pub state_diff: StateDiff,
     #[serde(alias = "verkleProof")]
     pub verkle_proof: VerkleProof,
+}
+
+impl StemStateDiff {
+    pub fn into_stem_state_write(self) -> Option<StemStateWrite> {
+        let writes = self
+            .suffix_diffs
+            .into_iter()
+            .flat_map(|suffix_state_diff| {
+                suffix_state_diff
+                    .new_value
+                    .map(|value| (suffix_state_diff.suffix.byte(0), value))
+            })
+            .collect::<HashMap<_, _>>();
+        if writes.is_empty() {
+            None
+        } else {
+            Some(StemStateWrite {
+                stem: self.stem,
+                writes,
+            })
+        }
+    }
 }

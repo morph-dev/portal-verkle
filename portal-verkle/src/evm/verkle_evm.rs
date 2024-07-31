@@ -4,19 +4,16 @@ use alloy_primitives::{address, keccak256, U8};
 use portal_verkle_primitives::{
     constants::{BALANCE_LEAF_KEY, CODE_KECCAK_LEAF_KEY, NONCE_LEAF_KEY, VERSION_LEAF_KEY},
     ssz::TriePath,
-    verkle::storage::AccountStorageLayout,
+    verkle::{
+        genesis_config::GenesisConfig, storage::AccountStorageLayout, StateWrites, VerkleTrie,
+    },
     TrieValue,
 };
 
 use super::error::EvmError;
-use crate::{
-    types::{
-        beacon::ExecutionPayload,
-        genesis::GenesisConfig,
-        state_write::StateWrites,
-        witness::{StateDiff, SuffixStateDiff},
-    },
-    verkle_trie::VerkleTrie,
+use crate::types::{
+    beacon::ExecutionPayload,
+    witness::{StateDiff, StemStateDiff, SuffixStateDiff},
 };
 
 pub struct VerkleEvm {
@@ -30,11 +27,9 @@ pub struct ProcessBlockResult {
 }
 
 impl VerkleEvm {
-    pub fn new(genesis_config: &GenesisConfig) -> Result<Self, EvmError> {
+    pub fn new(genesis_config: GenesisConfig) -> Result<Self, EvmError> {
         let mut state_trie = VerkleTrie::new();
-        state_trie
-            .update(&genesis_config.generate_state_diff().into())
-            .map_err(EvmError::TrieError)?;
+        state_trie.update(&genesis_config.into_state_writes());
         Ok(Self {
             block: 0,
             state_trie,
@@ -66,12 +61,14 @@ impl VerkleEvm {
             update_state_diff_for_eip2935(&mut state_diff);
         }
 
-        let state_writes = StateWrites::from(state_diff);
+        let state_writes = StateWrites::new(
+            state_diff
+                .into_iter()
+                .filter_map(StemStateDiff::into_stem_state_write)
+                .collect(),
+        );
 
-        let new_branch_nodes = self
-            .state_trie
-            .update(&state_writes)
-            .map_err(EvmError::TrieError)?;
+        let new_branch_nodes = self.state_trie.update(&state_writes);
         self.block += 1;
 
         if self.state_trie.root() != execution_payload.state_root {
@@ -115,15 +112,18 @@ fn update_state_diff_for_eip2935(state_diff: &mut StateDiff) {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs::File, io::BufReader};
+    use std::{
+        fs::File,
+        io::{stdout, BufReader},
+    };
 
     use alloy_primitives::{b256, B256};
-    use anyhow::Result;
+    use anyhow::{bail, Result};
+    use portal_verkle_primitives::verkle::trie_printer::TriePrinter;
 
     use crate::{
-        paths::{beacon_slot_path, test_path},
         types::SuccessMessage,
-        utils::read_genesis_for_test,
+        utils::{beacon_slot_path, read_genesis_for_test, test_path},
     };
 
     use super::*;
@@ -133,7 +133,7 @@ mod tests {
         const STATE_ROOT: B256 =
             b256!("1fbf85345a3cbba9a6d44f991b721e55620a22397c2a93ee8d5011136ac300ee");
 
-        let evm = VerkleEvm::new(&read_genesis_for_test()?)?;
+        let evm = VerkleEvm::new(read_genesis_for_test()?)?;
 
         assert_eq!(evm.state_trie.root(), STATE_ROOT);
         Ok(())
@@ -141,7 +141,7 @@ mod tests {
 
     #[test]
     fn process_block_1() -> Result<()> {
-        let mut evm = VerkleEvm::new(&read_genesis_for_test()?)?;
+        let mut evm = VerkleEvm::new(read_genesis_for_test()?)?;
 
         let reader = BufReader::new(File::open(test_path(beacon_slot_path(1)))?);
         let response: SuccessMessage = serde_json::from_reader(reader)?;
@@ -153,7 +153,7 @@ mod tests {
 
     #[test]
     fn process_block_1000() -> Result<()> {
-        let mut evm = VerkleEvm::new(&read_genesis_for_test()?)?;
+        let mut evm = VerkleEvm::new(read_genesis_for_test()?)?;
 
         for block in 1..=1000 {
             let path = test_path(beacon_slot_path(block));
@@ -163,7 +163,13 @@ mod tests {
             let reader = BufReader::new(File::open(path)?);
             let response: SuccessMessage = serde_json::from_reader(reader)?;
             let execution_payload = response.data.message.body.execution_payload;
-            evm.process_block(&execution_payload)?;
+            if let Err(err) = evm.process_block(&execution_payload) {
+                println!("Failed at block {block}");
+                evm.state_trie.print_state(&mut stdout())?;
+                evm.state_trie
+                    .print_trie_with_identation(&mut stdout(), 0)?;
+                bail!(err);
+            }
         }
         Ok(())
     }

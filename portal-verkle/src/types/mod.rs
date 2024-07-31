@@ -3,8 +3,6 @@ use serde::{Deserialize, Serialize};
 use self::beacon::SignedBeaconBlock;
 
 pub mod beacon;
-pub mod genesis;
-pub mod state_write;
 pub mod witness;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -34,7 +32,7 @@ mod tests {
         io::BufReader,
     };
 
-    use crate::paths::{test_path, TESTNET_DATA_PATH};
+    use crate::utils::{test_path, TESTNET_DATA_PATH};
 
     use super::*;
 

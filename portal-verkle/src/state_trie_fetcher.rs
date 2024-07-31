@@ -8,12 +8,10 @@ use ethportal_api::{
 };
 use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
 use portal_verkle_primitives::{
-    constants::PORTAL_NETWORK_NODE_WIDTH, portal::PortalVerkleNode, Point,
-};
-
-use crate::{
-    types::state_write::{StateWrites, StemStateWrite, SuffixStateWrite},
-    verkle_trie::VerkleTrie,
+    constants::PORTAL_NETWORK_NODE_WIDTH,
+    portal::PortalVerkleNode,
+    verkle::{StateWrites, StemStateWrite, VerkleTrie},
+    Point,
 };
 
 pub struct StateTrieFetcher {
@@ -36,29 +34,29 @@ impl StateTrieFetcher {
             let value = self.fetch_content(&key).await?;
             match &value {
                 VerkleContentValue::Node(PortalVerkleNode::BranchBundle(node)) => {
-                    let VerkleContentKey::Bundle(_key_commitment) = &key else {
+                    let VerkleContentKey::Bundle(key_commitment) = &key else {
                         bail!(
                             "Invalid BranchBundle value received! key: {}, value: {}",
                             key.to_hex(),
                             value.to_hex()
                         )
                     };
-                    // TODO check that commitment match
-                    // TODO check that bundle proof is valid
+                    node.verify(key_commitment)?;
+
                     for commitment in node.fragments().iter_set_items() {
                         stack.push(VerkleContentKey::BranchFragment(commitment.clone()));
                     }
                 }
                 VerkleContentValue::Node(PortalVerkleNode::LeafBundle(node)) => {
-                    let VerkleContentKey::Bundle(_key_commitment) = &key else {
+                    let VerkleContentKey::Bundle(key_commitment) = &key else {
                         bail!(
                             "Invalid LeafBundle value received! key: {}, value: {}",
                             key.to_hex(),
                             value.to_hex()
                         )
                     };
-                    // TODO check that commitment match
-                    // TODO check that bundle proof is valid
+                    node.verify(key_commitment)?;
+
                     for commitment in node.fragments().iter_set_items() {
                         stack.push(VerkleContentKey::LeafFragment(LeafFragmentKey {
                             stem: *node.stem(),
@@ -67,14 +65,15 @@ impl StateTrieFetcher {
                     }
                 }
                 VerkleContentValue::Node(PortalVerkleNode::BranchFragment(node)) => {
-                    let VerkleContentKey::BranchFragment(_key_commitment) = &key else {
+                    let VerkleContentKey::BranchFragment(key_commitment) = &key else {
                         bail!(
                             "Invalid BranchFragment value received! key: {}, value: {}",
                             key.to_hex(),
                             value.to_hex()
                         )
                     };
-                    // TODO check that commitment match
+                    node.verify(key_commitment)?;
+
                     for commitment in node.children().iter_set_items() {
                         stack.push(VerkleContentKey::Bundle(commitment.clone()));
                     }
@@ -87,24 +86,18 @@ impl StateTrieFetcher {
                             value.to_hex()
                         )
                     };
-                    // TODO check that commitment match
+                    node.verify(&leaf_fragment_key.commitment)?;
+
                     let start_index = node.fragment_index() as usize * PORTAL_NETWORK_NODE_WIDTH;
                     let stem_state_write = StemStateWrite {
                         stem: leaf_fragment_key.stem,
-                        suffix_writes: node
+                        writes: node
                             .children()
-                            .into_iter()
-                            .enumerate()
-                            .filter_map(|(index, opt_value)| {
-                                opt_value.map(|value| SuffixStateWrite {
-                                    suffix: (start_index + index) as u8,
-                                    old_value: None,
-                                    new_value: value,
-                                })
-                            })
+                            .iter_enumerated_set_items()
+                            .map(|(child_index, value)| ((start_index + child_index) as u8, *value))
                             .collect(),
                     };
-                    trie.update(&StateWrites::new(vec![stem_state_write]))?;
+                    trie.update(&StateWrites::new(vec![stem_state_write]));
                 }
                 _ => bail!("Invalid content value received: {}", value.to_hex()),
             }

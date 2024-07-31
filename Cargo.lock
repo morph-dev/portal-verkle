@@ -2964,6 +2964,7 @@ dependencies = [
  "clap",
  "derive_more",
  "ethportal-api",
+ "itertools 0.13.0",
  "jsonrpsee",
  "portal-verkle-primitives",
  "reqwest",

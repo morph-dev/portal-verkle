@@ -1,24 +1,26 @@
-use std::{fs::File, io::BufReader, path::Path};
-
-use portal_verkle_primitives::{
-    constants::PORTAL_NETWORK_NODE_WIDTH,
-    proof::{BundleProof, IpaProof, MultiProof},
-    ssz::SparseVector,
-    Point, ScalarField,
+use std::{
+    fs::File,
+    io::BufReader,
+    path::{Path, PathBuf},
 };
-use ssz_types::FixedVector;
 
-use crate::{paths::genesis_path, types::genesis::GenesisConfig};
+use portal_verkle_primitives::verkle::genesis_config::GenesisConfig;
 
-pub fn read_genesis() -> anyhow::Result<GenesisConfig> {
-    read_genesis_from_file(genesis_path())
-}
+pub const TESTNET_DATA_PATH: &str = "data/verkle-devnet-6/";
 
 #[cfg(test)]
-pub fn read_genesis_for_test() -> anyhow::Result<GenesisConfig> {
-    use crate::paths::test_path;
+pub fn test_path<P: AsRef<std::path::Path>>(path: P) -> PathBuf {
+    PathBuf::from("..").join(path)
+}
 
-    read_genesis_from_file(test_path(genesis_path()))
+pub fn beacon_slot_path(slot: u64) -> PathBuf {
+    PathBuf::from(TESTNET_DATA_PATH).join(format!("beacon/slot.{slot}.json"))
+}
+
+// Genesis
+
+fn genesis_path() -> PathBuf {
+    PathBuf::from(TESTNET_DATA_PATH).join("genesis.json")
 }
 
 fn read_genesis_from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<GenesisConfig> {
@@ -26,21 +28,11 @@ fn read_genesis_from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<GenesisConf
     Ok(serde_json::from_reader(reader)?)
 }
 
-pub fn bundle_proof(
-    _fragment_commitments: &SparseVector<Point, PORTAL_NETWORK_NODE_WIDTH>,
-) -> BundleProof {
-    // TODO: add implementation
-    BundleProof::new(dummy_multiproof())
+pub fn read_genesis() -> anyhow::Result<GenesisConfig> {
+    read_genesis_from_file(genesis_path())
 }
 
-pub fn dummy_multiproof() -> MultiProof {
-    // TODO: add implementation
-    MultiProof {
-        ipa_proof: IpaProof {
-            cl: FixedVector::from_elem(Point::zero()),
-            cr: FixedVector::from_elem(Point::zero()),
-            final_evaluation: ScalarField::zero(),
-        },
-        g_commitment: Point::zero(),
-    }
+#[cfg(test)]
+pub fn read_genesis_for_test() -> anyhow::Result<GenesisConfig> {
+    read_genesis_from_file(test_path(genesis_path()))
 }

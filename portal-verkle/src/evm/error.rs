@@ -1,7 +1,6 @@
 use alloy_primitives::B256;
+use portal_verkle_primitives::verkle::error::VerkleTrieError;
 use thiserror::Error;
-
-use crate::verkle_trie::error::VerkleTrieError;
 
 #[derive(Debug, Error)]
 pub enum EvmError {
