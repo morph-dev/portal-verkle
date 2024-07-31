@@ -1447,7 +1447,7 @@ dependencies = [
 [[package]]
 name = "ethportal-api"
 version = "0.2.2"
-source = "git+https://github.com/morph-dev/trin.git?rev=55d380fda6e53127126ecce5c5eac8bde627f735#55d380fda6e53127126ecce5c5eac8bde627f735"
+source = "git+https://github.com/morph-dev/trin.git?rev=d1b4f4cbf8ac1d93753a7fa39e08ecd70139bb3f#d1b4f4cbf8ac1d93753a7fa39e08ecd70139bb3f"
 dependencies = [
  "alloy-primitives",
  "alloy-rlp",
@@ -2262,6 +2262,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2969,7 +2978,7 @@ dependencies = [
 [[package]]
 name = "portal-verkle-primitives"
 version = "0.1.0"
-source = "git+https://github.com/morph-dev/portal-verkle-primitives.git?rev=640fbe4f6488a7d686d8df4561f1c7d6e8dc8403#640fbe4f6488a7d686d8df4561f1c7d6e8dc8403"
+source = "git+https://github.com/morph-dev/portal-verkle-primitives.git?rev=65ce73011fd2636733271219057c9dc194800ded#65ce73011fd2636733271219057c9dc194800ded"
 dependencies = [
  "alloy-primitives",
  "ark-ec",
@@ -2980,7 +2989,9 @@ dependencies = [
  "derive_more",
  "ethereum_ssz",
  "ethereum_ssz_derive",
+ "itertools 0.13.0",
  "once_cell",
+ "overload",
  "serde",
  "sha2",
  "ssz_types 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -4367,7 +4378,7 @@ dependencies = [
 [[package]]
 name = "trin-utils"
 version = "0.1.1-alpha.1"
-source = "git+https://github.com/morph-dev/trin.git?rev=55d380fda6e53127126ecce5c5eac8bde627f735#55d380fda6e53127126ecce5c5eac8bde627f735"
+source = "git+https://github.com/morph-dev/trin.git?rev=d1b4f4cbf8ac1d93753a7fa39e08ecd70139bb3f#d1b4f4cbf8ac1d93753a7fa39e08ecd70139bb3f"
 dependencies = [
  "ansi_term",
  "atty",

@@ -4,7 +4,7 @@ use alloy_primitives::{address, keccak256, U8};
 use portal_verkle_primitives::{
     constants::{BALANCE_LEAF_KEY, CODE_KECCAK_LEAF_KEY, NONCE_LEAF_KEY, VERSION_LEAF_KEY},
     ssz::TriePath,
-    storage::AccountStorageLayout,
+    verkle::storage::AccountStorageLayout,
     TrieValue,
 };
 

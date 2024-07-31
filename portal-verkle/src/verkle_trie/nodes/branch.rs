@@ -2,10 +2,9 @@ use std::{array, mem};
 
 use portal_verkle_primitives::{
     constants::{PORTAL_NETWORK_NODE_WIDTH, VERKLE_NODE_WIDTH},
-    msm::{DefaultMsm, MultiScalarMultiplicator},
-    nodes::{BranchBundleNode, BranchFragmentNode},
+    portal::{BranchBundleNode, BranchFragmentNode},
     ssz::{SparseVector, TriePath},
-    Point, ScalarField, Stem, TrieKey, TrieValue,
+    Point, ScalarField, Stem, TrieKey, TrieValue, CRS,
 };
 
 use crate::{
@@ -81,8 +80,10 @@ impl BranchNode {
                 }
             }
         }
-        self.commitment +=
-            DefaultMsm.scalar_mul(index, child.commitment_hash() - old_commitment_hash);
+        self.commitment += CRS::commit_single(
+            index as u8,
+            &(child.commitment_hash() - old_commitment_hash),
+        );
     }
 
     pub fn get_child(&self, index: usize) -> &Node {
@@ -90,9 +91,9 @@ impl BranchNode {
     }
 
     fn set_child(&mut self, index: usize, mut child: Node) {
-        self.commitment += DefaultMsm.scalar_mul(
-            index,
-            child.commitment_hash() - self.children[index].commitment_hash(),
+        self.commitment += CRS::commit_single(
+            index as u8,
+            &(child.commitment_hash() - self.children[index].commitment_hash()),
         );
         self.children[index] = child;
     }
@@ -133,8 +134,10 @@ impl BranchNode {
                 }
             }
         };
-        self.commitment +=
-            DefaultMsm.scalar_mul(index, child.commitment_hash() - old_commitment_hash);
+        self.commitment += CRS::commit_single(
+            index as u8,
+            &(child.commitment_hash() - old_commitment_hash),
+        );
         Ok(path_to_created_branch)
     }
 
@@ -145,7 +148,8 @@ impl BranchNode {
             let index = start_index + fragment_child_index;
             let child_commitment = self.children[index].commitment();
             if !child_commitment.is_zero() {
-                commitment += DefaultMsm.scalar_mul(index, child_commitment.map_to_scalar_field());
+                commitment +=
+                    CRS::commit_single(index as u8, &child_commitment.map_to_scalar_field());
             }
         }
         if commitment.is_zero() {

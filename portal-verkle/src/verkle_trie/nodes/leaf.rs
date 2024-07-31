@@ -5,10 +5,9 @@ use portal_verkle_primitives::{
         LEAF_C1_INDEX, LEAF_C2_INDEX, LEAF_MARKER_INDEX, LEAF_STEM_INDEX,
         PORTAL_NETWORK_NODE_WIDTH, VERKLE_NODE_WIDTH,
     },
-    msm::{DefaultMsm, MultiScalarMultiplicator},
-    nodes::{LeafBundleNode, LeafFragmentNode},
+    portal::{LeafBundleNode, LeafFragmentNode},
     ssz::SparseVector,
-    Point, ScalarField, Stem, TrieValue, TrieValueSplit,
+    Point, ScalarField, Stem, TrieValue, TrieValueSplit, CRS,
 };
 
 use crate::{
@@ -30,7 +29,7 @@ impl LeafNode {
     pub fn new(stem: Stem) -> Self {
         let marker = 1;
 
-        let commitment = DefaultMsm.commit_sparse(&[
+        let commitment = CRS::commit_sparse(&[
             (LEAF_MARKER_INDEX, ScalarField::from(marker)),
             (LEAF_STEM_INDEX, ScalarField::from(&stem)),
         ]);
@@ -70,24 +69,24 @@ impl LeafNode {
         let old_value = self.values[index].replace(value);
         let (old_low_value, old_high_value) = old_value.split();
 
-        let suffix_index = index % (VERKLE_NODE_WIDTH / 2);
-        let suffix_commitment_diff = DefaultMsm
-            .scalar_mul(2 * suffix_index, new_low_value - old_low_value)
-            + DefaultMsm.scalar_mul(2 * suffix_index + 1, new_high_value - old_high_value);
+        let suffix_index = (index % (VERKLE_NODE_WIDTH / 2)) as u8;
+        let suffix_commitment_diff =
+            CRS::commit_single(2 * suffix_index, &(new_low_value - old_low_value))
+                + CRS::commit_single(2 * suffix_index + 1, &(new_high_value - old_high_value));
 
         if index < VERKLE_NODE_WIDTH / 2 {
             let old_c1_commitment_hash = self.c1.commitment_hash();
             self.c1 += suffix_commitment_diff;
-            self.commitment += DefaultMsm.scalar_mul(
+            self.commitment += CRS::commit_single(
                 LEAF_C1_INDEX,
-                self.c1.commitment_hash() - old_c1_commitment_hash,
+                &(self.c1.commitment_hash() - old_c1_commitment_hash),
             );
         } else {
             let old_c2_commitment_hash = self.c2.commitment_hash();
             self.c2 += suffix_commitment_diff;
-            self.commitment += DefaultMsm.scalar_mul(
+            self.commitment += CRS::commit_single(
                 LEAF_C2_INDEX,
-                self.c2.commitment_hash() - old_c2_commitment_hash,
+                &(self.c2.commitment_hash() - old_c2_commitment_hash),
             );
         }
     }
@@ -117,8 +116,8 @@ impl LeafNode {
             let old_value = self.values[index].replace(new_value);
             let (old_low_value, old_high_value) = old_value.split();
 
-            let suffix_index = index % (VERKLE_NODE_WIDTH / 2);
-            let suffix_commitment_diff = DefaultMsm.commit_sparse(&[
+            let suffix_index = (index % (VERKLE_NODE_WIDTH / 2)) as u8;
+            let suffix_commitment_diff = CRS::commit_sparse(&[
                 (2 * suffix_index, new_low_value - old_low_value),
                 (2 * suffix_index + 1, new_high_value - old_high_value),
             ]);
@@ -129,13 +128,13 @@ impl LeafNode {
                 self.c2 += suffix_commitment_diff;
             }
         }
-        self.commitment += DefaultMsm.scalar_mul(
+        self.commitment += CRS::commit_single(
             LEAF_C1_INDEX,
-            self.c1.commitment_hash() - old_c1_commitment_hash,
+            &(self.c1.commitment_hash() - old_c1_commitment_hash),
         );
-        self.commitment += DefaultMsm.scalar_mul(
+        self.commitment += CRS::commit_single(
             LEAF_C2_INDEX,
-            self.c2.commitment_hash() - old_c2_commitment_hash,
+            &(self.c2.commitment_hash() - old_c2_commitment_hash),
         );
         Ok(())
     }
@@ -148,9 +147,9 @@ impl LeafNode {
             if let Some(value) = &self.values[index] {
                 let (low_value, high_value) = value.split();
 
-                let suffix_index = index % (VERKLE_NODE_WIDTH / 2);
-                commitment += DefaultMsm.scalar_mul(2 * suffix_index, low_value);
-                commitment += DefaultMsm.scalar_mul(2 * suffix_index + 1, high_value);
+                let suffix_index = (index % (VERKLE_NODE_WIDTH / 2)) as u8;
+                commitment += CRS::commit_single(2 * suffix_index, &low_value);
+                commitment += CRS::commit_single(2 * suffix_index + 1, &high_value);
             }
         }
         if commitment.is_zero() {

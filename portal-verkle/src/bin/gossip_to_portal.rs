@@ -14,19 +14,9 @@ use portal_verkle::{
     beacon_block_fetcher::BeaconBlockFetcher,
     evm::VerkleEvm,
     types::{genesis::GenesisConfig, state_write::StateWrites},
-    utils::{dummy_multiproof, read_genesis},
-    verkle_trie::PathToLeaf,
+    utils::read_genesis,
 };
-use portal_verkle_primitives::{
-    constants::PORTAL_NETWORK_NODE_WIDTH,
-    nodes::{
-        BranchBundleNodeWithProof, BranchFragmentNode, BranchFragmentNodeWithProof,
-        LeafBundleNodeWithProof, LeafFragmentNode, LeafFragmentNodeWithProof,
-        PortalVerkleNodeWithProof,
-    },
-    ssz::{TriePath, TrieProof},
-    Point, Stem,
-};
+use portal_verkle_primitives::{constants::PORTAL_NETWORK_NODE_WIDTH, ssz::TriePath};
 
 const LOCALHOST_BEACON_RPC_URL: &str = "http://localhost:9596/";
 const LOCALHOST_PORTAL_RPC_URL: &str = "http://localhost:8545/";
@@ -101,7 +91,7 @@ impl Gossiper {
 
     async fn gossip_state_writes(
         &self,
-        block_hash: B256,
+        _block_hash: B256,
         state_writes: StateWrites,
         new_branch_nodes: HashSet<TriePath>,
     ) -> anyhow::Result<()> {
@@ -122,20 +112,15 @@ impl Gossiper {
                 }
 
                 content_to_gossip.entry(content_key).or_insert_with(|| {
-                    let trie_proof = Self::create_bundle_trie_proof(
-                        stem,
-                        depth,
-                        &path_to_leaf,
-                        branch.commitment(),
-                    );
-                    VerkleContentValue::NodeWithProof(PortalVerkleNodeWithProof::BranchBundle(
-                        BranchBundleNodeWithProof {
-                            node: branch.extract_bundle_node(),
-                            block_hash,
-                            path: trie_path.clone(),
-                            proof: trie_proof,
-                        },
-                    ))
+                    // VerkleContentValue::NodeWithProof(PortalVerkleNodeWithProof::BranchBundle(
+                    //     BranchBundleNodeWithProof {
+                    //         node: branch.extract_bundle_node(),
+                    //         block_hash,
+                    //         path: trie_path.clone(),
+                    //         proof: trie_proof,
+                    //     },
+                    // ))
+                    todo!()
                 });
 
                 let fragment_indices = if new_branch_nodes.contains(&trie_path) {
@@ -146,30 +131,24 @@ impl Gossiper {
                 };
                 // Branch fragment
                 for fragment_index in fragment_indices {
-                    let (fragment_commitment, fragment) =
+                    let (fragment_commitment, _fragment) =
                         branch.extract_fragment_node(fragment_index);
                     if fragment_commitment.is_zero() {
                         continue;
                     }
                     let content_key = VerkleContentKey::BranchFragment(fragment_commitment);
                     content_to_gossip.entry(content_key).or_insert_with(|| {
-                        let trie_proof = Self::create_branch_fragment_trie_proof(
-                            stem,
-                            depth,
-                            &path_to_leaf,
-                            branch.commitment(),
-                            &fragment,
-                        );
-                        VerkleContentValue::NodeWithProof(
-                            PortalVerkleNodeWithProof::BranchFragment(
-                                BranchFragmentNodeWithProof {
-                                    node: fragment,
-                                    block_hash,
-                                    path: trie_path.clone(),
-                                    proof: trie_proof,
-                                },
-                            ),
-                        )
+                        // VerkleContentValue::NodeWithProof(
+                        //     PortalVerkleNodeWithProof::BranchFragment(
+                        //         BranchFragmentNodeWithProof {
+                        //             node: fragment,
+                        //             block_hash,
+                        //             path: trie_path.clone(),
+                        //             proof: trie_proof,
+                        //         },
+                        //     ),
+                        // )
+                        todo!()
                     });
                 }
             }
@@ -178,19 +157,14 @@ impl Gossiper {
             let bundle_commitment = path_to_leaf.leaf.commitment();
             let content_key = VerkleContentKey::Bundle(bundle_commitment.clone());
             content_to_gossip.entry(content_key).or_insert_with(|| {
-                let trie_proof = Self::create_bundle_trie_proof(
-                    stem,
-                    path_to_leaf.branches.len(),
-                    &path_to_leaf,
-                    bundle_commitment,
-                );
-                VerkleContentValue::NodeWithProof(PortalVerkleNodeWithProof::LeafBundle(
-                    LeafBundleNodeWithProof {
-                        node: path_to_leaf.leaf.extract_bundle_node(),
-                        block_hash,
-                        proof: trie_proof,
-                    },
-                ))
+                // VerkleContentValue::NodeWithProof(PortalVerkleNodeWithProof::LeafBundle(
+                //     LeafBundleNodeWithProof {
+                //         node: path_to_leaf.leaf.extract_bundle_node(),
+                //         block_hash,
+                //         proof: trie_proof,
+                //     },
+                // ))
+                todo!()
             });
 
             // Leaf Fragments
@@ -202,7 +176,7 @@ impl Gossiper {
             modified_fragments.sort();
             modified_fragments.dedup();
             for fragment_index in modified_fragments {
-                let (fragment_commitment, fragment_node) =
+                let (fragment_commitment, _fragment_node) =
                     path_to_leaf.leaf.extract_fragment_node(fragment_index);
                 let content_key = VerkleContentKey::LeafFragment(LeafFragmentKey {
                     stem: *stem,
@@ -210,20 +184,14 @@ impl Gossiper {
                 });
 
                 content_to_gossip.entry(content_key).or_insert_with(|| {
-                    let trie_proof = Self::create_leaf_fragment_trie_proof(
-                        stem,
-                        path_to_leaf.branches.len(),
-                        &path_to_leaf,
-                        bundle_commitment,
-                        &fragment_node,
-                    );
-                    VerkleContentValue::NodeWithProof(PortalVerkleNodeWithProof::LeafFragment(
-                        LeafFragmentNodeWithProof {
-                            node: fragment_node,
-                            block_hash,
-                            proof: trie_proof,
-                        },
-                    ))
+                    // VerkleContentValue::NodeWithProof(PortalVerkleNodeWithProof::LeafFragment(
+                    //     LeafFragmentNodeWithProof {
+                    //         node: fragment_node,
+                    //         block_hash,
+                    //         proof: trie_proof,
+                    //     },
+                    // ))
+                    todo!()
                 });
             }
         }
@@ -232,56 +200,6 @@ impl Gossiper {
             self.portal_client.gossip(key, value).await?;
         }
         Ok(())
-    }
-
-    fn create_bundle_trie_proof(
-        _stem: &Stem,
-        depth: usize,
-        path_to_leaf: &PathToLeaf,
-        _node_commitment: &Point,
-    ) -> TrieProof {
-        TrieProof {
-            commitments_by_path: path_to_leaf.branches[..depth]
-                .iter()
-                .map(|branch| branch.commitment().clone())
-                .collect::<Vec<_>>()
-                .into(),
-            multi_point_proof: dummy_multiproof(),
-        }
-    }
-
-    fn create_branch_fragment_trie_proof(
-        _stem: &Stem,
-        depth: usize,
-        path_to_leaf: &PathToLeaf,
-        _bundle_node_commitment: &Point,
-        _node: &BranchFragmentNode,
-    ) -> TrieProof {
-        TrieProof {
-            commitments_by_path: path_to_leaf.branches[..depth]
-                .iter()
-                .map(|branch| branch.commitment().clone())
-                .collect::<Vec<_>>()
-                .into(),
-            multi_point_proof: dummy_multiproof(),
-        }
-    }
-
-    fn create_leaf_fragment_trie_proof(
-        _stem: &Stem,
-        depth: usize,
-        path_to_leaf: &PathToLeaf,
-        _bundle_node_commitment: &Point,
-        _node: &LeafFragmentNode,
-    ) -> TrieProof {
-        TrieProof {
-            commitments_by_path: path_to_leaf.branches[..depth]
-                .iter()
-                .map(|branch| branch.commitment().clone())
-                .collect::<Vec<_>>()
-                .into(),
-            multi_point_proof: dummy_multiproof(),
-        }
     }
 }
 

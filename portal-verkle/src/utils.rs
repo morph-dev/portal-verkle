@@ -2,7 +2,7 @@ use std::{fs::File, io::BufReader, path::Path};
 
 use portal_verkle_primitives::{
     constants::PORTAL_NETWORK_NODE_WIDTH,
-    proof::{BundleProof, IpaProof, MultiPointProof},
+    proof::{BundleProof, IpaProof, MultiProof},
     ssz::SparseVector,
     Point, ScalarField,
 };
@@ -33,14 +33,14 @@ pub fn bundle_proof(
     BundleProof::new(dummy_multiproof())
 }
 
-pub fn dummy_multiproof() -> MultiPointProof {
+pub fn dummy_multiproof() -> MultiProof {
     // TODO: add implementation
-    MultiPointProof {
+    MultiProof {
         ipa_proof: IpaProof {
             cl: FixedVector::from_elem(Point::zero()),
             cr: FixedVector::from_elem(Point::zero()),
             final_evaluation: ScalarField::zero(),
         },
-        g_x: Point::zero(),
+        g_commitment: Point::zero(),
     }
 }

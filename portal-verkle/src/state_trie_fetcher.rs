@@ -8,7 +8,7 @@ use ethportal_api::{
 };
 use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
 use portal_verkle_primitives::{
-    constants::PORTAL_NETWORK_NODE_WIDTH, nodes::PortalVerkleNode, Point,
+    constants::PORTAL_NETWORK_NODE_WIDTH, portal::PortalVerkleNode, Point,
 };
 
 use crate::{
@@ -88,7 +88,7 @@ impl StateTrieFetcher {
                         )
                     };
                     // TODO check that commitment match
-                    let start_index = node.fragment_index() * PORTAL_NETWORK_NODE_WIDTH;
+                    let start_index = node.fragment_index() as usize * PORTAL_NETWORK_NODE_WIDTH;
                     let stem_state_write = StemStateWrite {
                         stem: leaf_fragment_key.stem,
                         suffix_writes: node
