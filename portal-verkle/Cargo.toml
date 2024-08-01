@@ -11,7 +11,7 @@ alloy-primitives = { version = "0.7", features = ["serde", "rlp"] }
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 derive_more = "0.99"
-ethportal-api = { git = "https://github.com/morph-dev/trin.git", rev = "af94a8007a93783345a6e2d8627e7f6f1886a2f4" }
+ethportal-api = { git = "https://github.com/morph-dev/trin.git", rev = "fea95e54a35cfb241406d5cfbbb3774e7cd4427d" }
 futures = "0.3"
 itertools = "0.13"
 jsonrpsee = { version = "0.20", features = ["async-client", "client"] }
