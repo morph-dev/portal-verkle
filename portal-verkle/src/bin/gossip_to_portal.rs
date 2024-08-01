@@ -1,18 +1,34 @@
 use std::{
-    collections::{HashMap, HashSet},
-    time::Duration,
+    cmp::Ordering,
+    collections::{BTreeMap, HashSet},
+    time::{Duration, Instant},
 };
 
 use alloy_primitives::B256;
 use clap::Parser;
-use ethportal_api::{VerkleContentKey, VerkleContentValue, VerkleNetworkApiClient};
+use ethportal_api::{
+    types::content_key::verkle::LeafFragmentKey, VerkleContentKey, VerkleContentValue,
+    VerkleNetworkApiClient,
+};
+use futures::future;
+use itertools::{zip_eq, Itertools};
 use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
 use portal_verkle::{
     beacon_block_fetcher::BeaconBlockFetcher, evm::VerkleEvm, utils::read_genesis,
 };
 use portal_verkle_primitives::{
+    constants::PORTAL_NETWORK_NODE_WIDTH,
+    portal::PortalVerkleNodeWithProof,
     ssz::TriePath,
-    verkle::{genesis_config::GenesisConfig, StateWrites},
+    verkle::{
+        genesis_config::GenesisConfig,
+        nodes::{
+            portal_branch_node_builder::PortalBranchNodeBuilder,
+            portal_leaf_node_builder::PortalLeafNodeBuilder,
+        },
+        StateWrites,
+    },
+    Stem,
 };
 
 const LOCALHOST_BEACON_RPC_URL: &str = "http://localhost:9596/";
@@ -27,6 +43,43 @@ pub struct Args {
     pub beacon_rpc_url: String,
     #[arg(long, default_value_t = String::from(LOCALHOST_PORTAL_RPC_URL))]
     pub portal_rpc_url: String,
+}
+
+struct BranchNodeBuilderWithFragments<'a> {
+    builder: PortalBranchNodeBuilder<'a>,
+    fragment_indices: HashSet<u8>,
+}
+
+struct LeafNodeBuilderWithFragments<'a> {
+    stem: Stem,
+    builder: PortalLeafNodeBuilder<'a>,
+    fragment_indices: HashSet<u8>,
+}
+
+struct TriePathWrapper(TriePath);
+
+impl Eq for TriePathWrapper {}
+
+impl PartialEq for TriePathWrapper {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other).is_eq()
+    }
+}
+
+impl PartialOrd for TriePathWrapper {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for TriePathWrapper {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.len().cmp(&other.0.len()).then_with(|| {
+            zip_eq(&self.0, &other.0)
+                .find_map(|(a, b)| if a == b { None } else { Some(a.cmp(b)) })
+                .unwrap_or(Ordering::Equal)
+        })
+    }
 }
 
 struct Gossiper {
@@ -87,116 +140,163 @@ impl Gossiper {
 
     async fn gossip_state_writes(
         &self,
-        _block_hash: B256,
+        block_hash: B256,
         state_writes: StateWrites,
         new_branch_nodes: HashSet<TriePath>,
     ) -> anyhow::Result<()> {
-        let mut content_to_gossip = HashMap::<VerkleContentKey, VerkleContentValue>::new();
+        let timer = Instant::now();
+
+        let mut branches_to_gossip: BTreeMap<TriePathWrapper, BranchNodeBuilderWithFragments> =
+            BTreeMap::new();
+        let mut leaves_to_gossip: BTreeMap<Stem, LeafNodeBuilderWithFragments> = BTreeMap::new();
+
         for stem_state_write in state_writes.iter() {
             let stem = &stem_state_write.stem;
             let path_to_leaf = self.evm.state_trie().traverse_to_leaf(stem)?;
-            for (depth, (branch, _)) in path_to_leaf.trie_path.iter().enumerate() {
+
+            for depth in 0..path_to_leaf.trie_path.len() {
                 let trie_path = TriePath::from(stem[..depth].to_vec());
+                let (branch, child_index) = path_to_leaf.trie_path[depth];
 
-                // Branch bundle
-                let content_key = VerkleContentKey::Bundle(branch.commitment().to_point());
-                if new_branch_nodes.contains(&trie_path)
-                    && content_to_gossip.contains_key(&content_key)
-                {
-                    // We already gossiped this bundle and all fragments
-                    continue;
-                }
-
-                content_to_gossip.entry(content_key).or_insert_with(|| {
-                    // VerkleContentValue::NodeWithProof(PortalVerkleNodeWithProof::BranchBundle(
-                    //     BranchBundleNodeWithProof {
-                    //         node: branch.extract_bundle_node(),
-                    //         block_hash,
-                    //         path: trie_path.clone(),
-                    //         proof: trie_proof,
-                    //     },
-                    // ))
-                    todo!()
-                });
-
-                // let fragment_indices = if new_branch_nodes.contains(&trie_path) {
-                //     0..PORTAL_NETWORK_NODE_WIDTH
-                // } else {
-                //     let fragment_index = stem[depth] as usize / PORTAL_NETWORK_NODE_WIDTH;
-                //     fragment_index..fragment_index + 1
-                // };
-                // Branch fragment
-                // for fragment_index in fragment_indices {
-                //     let (fragment_commitment, _fragment) =
-                //         branch.extract_fragment_node(fragment_index);
-                //     if fragment_commitment.is_zero() {
-                //         continue;
-                //     }
-                //     let content_key = VerkleContentKey::BranchFragment(fragment_commitment);
-                //     content_to_gossip.entry(content_key).or_insert_with(|| {
-                //         // VerkleContentValue::NodeWithProof(
-                //         //     PortalVerkleNodeWithProof::BranchFragment(
-                //         //         BranchFragmentNodeWithProof {
-                //         //             node: fragment,
-                //         //             block_hash,
-                //         //             path: trie_path.clone(),
-                //         //             proof: trie_proof,
-                //         //         },
-                //         //     ),
-                //         // )
-                //         todo!()
-                //     });
-                // }
-                todo!()
+                branches_to_gossip
+                    .entry(TriePathWrapper(trie_path))
+                    .or_insert_with_key(|trie_path| {
+                        let builder =
+                            PortalBranchNodeBuilder::new(branch, &path_to_leaf.trie_path[..depth])
+                                .expect("creating PortalBranchNodeBuilder should succeed");
+                        let fragment_indices = if new_branch_nodes.contains(&trie_path.0) {
+                            HashSet::from_iter((0..PORTAL_NETWORK_NODE_WIDTH as u8).filter(
+                                |fragment_index| {
+                                    !builder.fragment_commitment(*fragment_index).is_zero()
+                                },
+                            ))
+                        } else {
+                            HashSet::new()
+                        };
+                        BranchNodeBuilderWithFragments {
+                            builder,
+                            fragment_indices,
+                        }
+                    })
+                    .fragment_indices
+                    .insert(child_index / PORTAL_NETWORK_NODE_WIDTH as u8);
             }
 
-            // Leaf bundle
-            let bundle_commitment = path_to_leaf.leaf.commitment();
-            let content_key = VerkleContentKey::Bundle(bundle_commitment.to_point());
-            content_to_gossip.entry(content_key).or_insert_with(|| {
-                // VerkleContentValue::NodeWithProof(PortalVerkleNodeWithProof::LeafBundle(
-                //     LeafBundleNodeWithProof {
-                //         node: path_to_leaf.leaf.extract_bundle_node(),
-                //         block_hash,
-                //         proof: trie_proof,
-                //     },
-                // ))
-                todo!()
+            leaves_to_gossip
+                .entry(*stem)
+                .or_insert_with(|| {
+                    let builder = PortalLeafNodeBuilder::new(&path_to_leaf);
+                    LeafNodeBuilderWithFragments {
+                        stem: *stem,
+                        builder,
+                        fragment_indices: HashSet::new(),
+                    }
+                })
+                .fragment_indices
+                .extend(
+                    stem_state_write
+                        .writes
+                        .keys()
+                        .map(|child_index| child_index / PORTAL_NETWORK_NODE_WIDTH as u8)
+                        .dedup(),
+                );
+        }
+
+        for (trie_path, builder_with_fragments) in branches_to_gossip.into_iter() {
+            self.gossip_branch_node(trie_path.0, builder_with_fragments, block_hash)
+                .await?;
+        }
+
+        for builder_with_fragments in leaves_to_gossip.into_values() {
+            self.gossip_leaf_node(builder_with_fragments, block_hash)
+                .await?;
+        }
+
+        println!("Elapsed: {:?}", timer.elapsed());
+        Ok(())
+    }
+
+    async fn gossip_branch_node(
+        &self,
+        trie_path: TriePath,
+        builder_with_fragments: BranchNodeBuilderWithFragments<'_>,
+        block_hash: B256,
+    ) -> anyhow::Result<()> {
+        let BranchNodeBuilderWithFragments {
+            builder,
+            fragment_indices,
+        } = builder_with_fragments;
+        println!(
+            "  branch: {} {:x?}",
+            trie_path.into_iter().map(|i| format!("{i:x}")).join(""),
+            fragment_indices.iter().sorted().collect_vec()
+        );
+
+        let mut gossip_futures = vec![];
+
+        // Gossip bundle
+        let bundle_node = builder.bundle_node_with_proof(block_hash);
+        let bundle_key = VerkleContentKey::Bundle(bundle_node.node.commitment().clone());
+        let bundle_value =
+            VerkleContentValue::NodeWithProof(PortalVerkleNodeWithProof::BranchBundle(bundle_node));
+        gossip_futures.push(self.portal_client.gossip(bundle_key, bundle_value));
+
+        // Gossip fragments
+        for fragment_index in fragment_indices {
+            let fragment_key = VerkleContentKey::BranchFragment(
+                builder.fragment_commitment(fragment_index).clone(),
+            );
+            let fragment_value =
+                VerkleContentValue::NodeWithProof(PortalVerkleNodeWithProof::BranchFragment(
+                    builder.fragment_node_with_proof(fragment_index, block_hash),
+                ));
+            gossip_futures.push(self.portal_client.gossip(fragment_key, fragment_value));
+        }
+
+        future::try_join_all(gossip_futures).await?;
+
+        Ok(())
+    }
+
+    async fn gossip_leaf_node(
+        &self,
+        builder_with_fragments: LeafNodeBuilderWithFragments<'_>,
+        block_hash: B256,
+    ) -> anyhow::Result<()> {
+        let LeafNodeBuilderWithFragments {
+            stem,
+            builder,
+            fragment_indices,
+        } = builder_with_fragments;
+        println!(
+            "  leaf:   {stem} {:x?}",
+            fragment_indices.iter().sorted().collect_vec()
+        );
+
+        let mut gossip_futures = vec![];
+
+        // Gossip bundle
+        let bundle_node = builder.bundle_node_with_proof(block_hash);
+        let bundle_key = VerkleContentKey::Bundle(bundle_node.node.commitment().clone());
+        let bundle_value =
+            VerkleContentValue::NodeWithProof(PortalVerkleNodeWithProof::LeafBundle(bundle_node));
+        gossip_futures.push(self.portal_client.gossip(bundle_key, bundle_value));
+
+        // Gossip fragments
+        for fragment_index in fragment_indices {
+            let fragment_key = VerkleContentKey::LeafFragment(LeafFragmentKey {
+                stem,
+                commitment: builder.fragment_commitment(fragment_index).clone(),
             });
-
-            // Leaf Fragments
-            // let mut modified_fragments = stem_state_write
-            //     .writes
-            //     .iter()
-            //     .map(|(suffix, _value)| *suffix as usize / PORTAL_NETWORK_NODE_WIDTH)
-            //     .collect::<Vec<_>>();
-            // modified_fragments.sort();
-            // modified_fragments.dedup();
-            // for fragment_index in modified_fragments {
-            //     let (fragment_commitment, _fragment_node) =
-            //         path_to_leaf.leaf.extract_fragment_node(fragment_index);
-            //     let content_key = VerkleContentKey::LeafFragment(LeafFragmentKey {
-            //         stem: *stem,
-            //         commitment: fragment_commitment,
-            //     });
-
-            //     content_to_gossip.entry(content_key).or_insert_with(|| {
-            //         // VerkleContentValue::NodeWithProof(PortalVerkleNodeWithProof::LeafFragment(
-            //         //     LeafFragmentNodeWithProof {
-            //         //         node: fragment_node,
-            //         //         block_hash,
-            //         //         proof: trie_proof,
-            //         //     },
-            //         // ))
-            //         todo!()
-            //     });
-            // }
-            todo!()
+            let fragment_value =
+                VerkleContentValue::NodeWithProof(PortalVerkleNodeWithProof::LeafFragment(
+                    builder.fragment_node_with_proof(fragment_index, block_hash),
+                ));
+            gossip_futures.push(self.portal_client.gossip(fragment_key, fragment_value));
         }
 
-        for (key, value) in content_to_gossip {
-            self.portal_client.gossip(key, value).await?;
-        }
+        future::try_join_all(gossip_futures).await?;
+
         Ok(())
     }
 }
@@ -209,10 +309,12 @@ async fn main() -> anyhow::Result<()> {
     let mut gossiper = Gossiper::new(&args)?;
 
     println!("Starting gossiping");
+    let timer = Instant::now();
     gossiper.gossip_genesis().await?;
     for slot in 1..=args.slots {
         gossiper.gossip_slot(slot).await?;
     }
+    println!("Finished gossiping in {:?}", timer.elapsed());
 
     Ok(())
 }

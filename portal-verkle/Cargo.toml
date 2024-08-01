@@ -11,10 +11,11 @@ alloy-primitives = { version = "0.7", features = ["serde", "rlp"] }
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 derive_more = "0.99"
-ethportal-api = { git = "https://github.com/morph-dev/trin.git", rev = "d1b4f4cbf8ac1d93753a7fa39e08ecd70139bb3f" }
+ethportal-api = { git = "https://github.com/morph-dev/trin.git", rev = "af94a8007a93783345a6e2d8627e7f6f1886a2f4" }
+futures = "0.3"
 itertools = "0.13"
 jsonrpsee = { version = "0.20", features = ["async-client", "client"] }
-portal-verkle-primitives = { git = "https://github.com/morph-dev/portal-verkle-primitives.git", rev = "65ce73011fd2636733271219057c9dc194800ded" }
+portal-verkle-primitives = { git = "https://github.com/morph-dev/portal-verkle-primitives.git", rev = "244a975baca2af42d4a596f7f6f83bc26c35223b" }
 reqwest = { version = "0.12", features = ["json"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

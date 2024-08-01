@@ -1447,7 +1447,7 @@ dependencies = [
 [[package]]
 name = "ethportal-api"
 version = "0.2.2"
-source = "git+https://github.com/morph-dev/trin.git?rev=d1b4f4cbf8ac1d93753a7fa39e08ecd70139bb3f#d1b4f4cbf8ac1d93753a7fa39e08ecd70139bb3f"
+source = "git+https://github.com/morph-dev/trin.git?rev=af94a8007a93783345a6e2d8627e7f6f1886a2f4#af94a8007a93783345a6e2d8627e7f6f1886a2f4"
 dependencies = [
  "alloy-primitives",
  "alloy-rlp",
@@ -2964,6 +2964,7 @@ dependencies = [
  "clap",
  "derive_more",
  "ethportal-api",
+ "futures",
  "itertools 0.13.0",
  "jsonrpsee",
  "portal-verkle-primitives",
@@ -2979,7 +2980,7 @@ dependencies = [
 [[package]]
 name = "portal-verkle-primitives"
 version = "0.1.0"
-source = "git+https://github.com/morph-dev/portal-verkle-primitives.git?rev=65ce73011fd2636733271219057c9dc194800ded#65ce73011fd2636733271219057c9dc194800ded"
+source = "git+https://github.com/morph-dev/portal-verkle-primitives.git?rev=244a975baca2af42d4a596f7f6f83bc26c35223b#244a975baca2af42d4a596f7f6f83bc26c35223b"
 dependencies = [
  "alloy-primitives",
  "ark-ec",
@@ -4379,7 +4380,7 @@ dependencies = [
 [[package]]
 name = "trin-utils"
 version = "0.1.1-alpha.1"
-source = "git+https://github.com/morph-dev/trin.git?rev=d1b4f4cbf8ac1d93753a7fa39e08ecd70139bb3f#d1b4f4cbf8ac1d93753a7fa39e08ecd70139bb3f"
+source = "git+https://github.com/morph-dev/trin.git?rev=af94a8007a93783345a6e2d8627e7f6f1886a2f4#af94a8007a93783345a6e2d8627e7f6f1886a2f4"
 dependencies = [
  "ansi_term",
  "atty",
