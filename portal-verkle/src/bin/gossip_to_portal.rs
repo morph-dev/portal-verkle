@@ -51,7 +51,6 @@ struct BranchNodeBuilderWithFragments<'a> {
 }
 
 struct LeafNodeBuilderWithFragments<'a> {
-    stem: Stem,
     builder: PortalLeafNodeBuilder<'a>,
     fragment_indices: HashSet<u8>,
 }
@@ -187,7 +186,6 @@ impl Gossiper {
                 .or_insert_with(|| {
                     let builder = PortalLeafNodeBuilder::new(&path_to_leaf);
                     LeafNodeBuilderWithFragments {
-                        stem: *stem,
                         builder,
                         fragment_indices: HashSet::new(),
                     }
@@ -227,7 +225,7 @@ impl Gossiper {
             fragment_indices,
         } = builder_with_fragments;
         println!(
-            "  branch: {} {:x?}",
+            "  branch: 0x{} children: {:x?}",
             trie_path.into_iter().map(|i| format!("{i:x}")).join(""),
             fragment_indices.iter().sorted().collect_vec()
         );
@@ -235,10 +233,10 @@ impl Gossiper {
         let mut gossip_futures = vec![];
 
         // Gossip bundle
-        let bundle_node = builder.bundle_node_with_proof(block_hash);
-        let bundle_key = VerkleContentKey::Bundle(bundle_node.node.commitment().clone());
-        let bundle_value =
-            VerkleContentValue::NodeWithProof(PortalVerkleNodeWithProof::BranchBundle(bundle_node));
+        let bundle_key = VerkleContentKey::Bundle(builder.bundle_commitment().clone());
+        let bundle_value = VerkleContentValue::NodeWithProof(
+            PortalVerkleNodeWithProof::BranchBundle(builder.bundle_node_with_proof(block_hash)),
+        );
         gossip_futures.push(self.portal_client.gossip(bundle_key, bundle_value));
 
         // Gossip fragments
@@ -264,28 +262,28 @@ impl Gossiper {
         block_hash: B256,
     ) -> anyhow::Result<()> {
         let LeafNodeBuilderWithFragments {
-            stem,
             builder,
             fragment_indices,
         } = builder_with_fragments;
         println!(
-            "  leaf:   {stem} {:x?}",
+            "  leaf: {} children: {:x?}",
+            builder.stem(),
             fragment_indices.iter().sorted().collect_vec()
         );
 
         let mut gossip_futures = vec![];
 
         // Gossip bundle
-        let bundle_node = builder.bundle_node_with_proof(block_hash);
-        let bundle_key = VerkleContentKey::Bundle(bundle_node.node.commitment().clone());
-        let bundle_value =
-            VerkleContentValue::NodeWithProof(PortalVerkleNodeWithProof::LeafBundle(bundle_node));
+        let bundle_key = VerkleContentKey::Bundle(builder.bundle_commitment().clone());
+        let bundle_value = VerkleContentValue::NodeWithProof(
+            PortalVerkleNodeWithProof::LeafBundle(builder.bundle_node_with_proof(block_hash)),
+        );
         gossip_futures.push(self.portal_client.gossip(bundle_key, bundle_value));
 
         // Gossip fragments
         for fragment_index in fragment_indices {
             let fragment_key = VerkleContentKey::LeafFragment(LeafFragmentKey {
-                stem,
+                stem: *builder.stem(),
                 commitment: builder.fragment_commitment(fragment_index).clone(),
             });
             let fragment_value =
